@@ -1,0 +1,59 @@
+version: "3.9"
+services:
+  redis:
+    hostname: ${REDIS_HOST}
+    image: redis:latest
+    ports:
+      - ${REDIS_EXPOSED_PORT}:${REDIS_PORT}
+    networks:
+      - cache
+
+  nginx:
+    hostname: ${NGINX_HOST}
+    build:
+      context: ./
+      dockerfile: nginx/Dockerfile
+      args:
+        RATE_LIMITER_HOST: ${RATE_LIMITER_HOST}
+        RATE_LIMITER_HTTP_PORT: ${RATE_LIMITER_HTTP_PORT}
+        NOTIFICATION_HOST: ${NOTIFICATION_HOST}
+        NOTIFICATION_HTTP_PORT: ${NOTIFICATION_HTTP_PORT}
+    ports:
+      - ${HTTP_PROXY_PORT}:80
+    networks:
+      - backend
+
+  rate-limiter:
+    hostname: ${RATE_LIMITER_HOST}
+    build:
+      context: ./
+      dockerfile: docker/rate_limiter/Dockerfile
+      args:
+        RATE_LIMITER_HTTP_PORT: ${RATE_LIMITER_HTTP_PORT}
+        REDIS_HOST: ${REDIS_HOST}
+        REDIS_EXPOSED_PORT: ${REDIS_EXPOSED_PORT}
+        NOTIFICATION_HOST: ${NOTIFICATION_HOST}
+        NOTIFICATION_GRPC_PORT: ${NOTIFICATION_GRPC_PORT}
+    ports:
+      - ${RATE_LIMITER_HTTP_PORT}:${RATE_LIMITER_HTTP_PORT}
+    networks:
+      - backend
+      - cache
+
+  notification:
+    hostname: ${NOTIFICATION_HOST}
+    build:
+      context: docker
+      dockerfile: notification/Dockerfile
+      args:
+        NOTIFICATION_HTTP_PORT: ${NOTIFICATION_HTTP_PORT}
+        NOTIFICATION_GRPC_PORT: ${NOTIFICATION_GRPC_PORT}
+    ports:
+      - ${NOTIFICATION_HTTP_PORT}:${NOTIFICATION_HTTP_PORT}
+      - ${NOTIFICATION_GRPC_PORT}:${NOTIFICATION_GRPC_PORT}
+    networks:
+      - backend
+
+networks:
+  backend:
+  cache:

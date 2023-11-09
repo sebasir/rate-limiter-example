@@ -1,0 +1,11 @@
+.git
+.idea
+**/*.env
+**/*.sample
+**/*.iml
+**/*.yml
+**/*.proto
+**/*.md
+**/*.dockerignore
+**/*.gitignore
+**/Dockerfile
