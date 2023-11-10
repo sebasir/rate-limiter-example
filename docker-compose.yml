@@ -12,7 +12,7 @@ services:
     hostname: ${NGINX_HOST}
     build:
       context: ./
-      dockerfile: nginx/Dockerfile
+      dockerfile: docker/nginx/Dockerfile
       args:
         RATE_LIMITER_HOST: ${RATE_LIMITER_HOST}
         RATE_LIMITER_HTTP_PORT: ${RATE_LIMITER_HTTP_PORT}
@@ -27,13 +27,16 @@ services:
     hostname: ${RATE_LIMITER_HOST}
     build:
       context: ./
-      dockerfile: docker/rate_limiter/Dockerfile
+      dockerfile: docker/go/Dockerfile
       args:
-        RATE_LIMITER_HTTP_PORT: ${RATE_LIMITER_HTTP_PORT}
-        REDIS_HOST: ${REDIS_HOST}
-        REDIS_EXPOSED_PORT: ${REDIS_EXPOSED_PORT}
-        NOTIFICATION_HOST: ${NOTIFICATION_HOST}
-        NOTIFICATION_GRPC_PORT: ${NOTIFICATION_GRPC_PORT}
+        TARGET_APP: http_rate_limiter
+    environment:
+      DEBUG: ${DEBUG}
+      RATE_LIMITER_HTTP_PORT: ${RATE_LIMITER_HTTP_PORT}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_EXPOSED_PORT: ${REDIS_EXPOSED_PORT}
+      NOTIFICATION_HOST: ${NOTIFICATION_HOST}
+      NOTIFICATION_GRPC_PORT: ${NOTIFICATION_GRPC_PORT}
     ports:
       - ${RATE_LIMITER_HTTP_PORT}:${RATE_LIMITER_HTTP_PORT}
     networks:
@@ -43,11 +46,14 @@ services:
   notification:
     hostname: ${NOTIFICATION_HOST}
     build:
-      context: docker
-      dockerfile: notification/Dockerfile
+      context: ./
+      dockerfile: docker/go/Dockerfile
       args:
-        NOTIFICATION_HTTP_PORT: ${NOTIFICATION_HTTP_PORT}
-        NOTIFICATION_GRPC_PORT: ${NOTIFICATION_GRPC_PORT}
+        TARGET_APP: grpc_notification_service
+    environment:
+      DEBUG: ${DEBUG}
+      NOTIFICATION_HTTP_PORT: ${NOTIFICATION_HTTP_PORT}
+      NOTIFICATION_GRPC_PORT: ${NOTIFICATION_GRPC_PORT}
     ports:
       - ${NOTIFICATION_HTTP_PORT}:${NOTIFICATION_HTTP_PORT}
       - ${NOTIFICATION_GRPC_PORT}:${NOTIFICATION_GRPC_PORT}

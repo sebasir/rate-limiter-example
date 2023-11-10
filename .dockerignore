@@ -8,4 +8,4 @@
 **/*.md
 **/*.dockerignore
 **/*.gitignore
-**/Dockerfile
+docker/go/Dockerfile

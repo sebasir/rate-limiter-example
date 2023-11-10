@@ -29,7 +29,7 @@ func NewClient(rdb *redis.Client, delegate service.Client) service.Client {
 }
 
 func (c client) Send(mail *pb.Notification, config *pb.Config) (*pb.Result, error) {
-	c.logger.Debug("sending notification...", zap.String("email", mail.Recipient))
+	c.logger.Debug("sending notification", zap.String("recipient", mail.Recipient))
 
 	key := fmt.Sprintf("%s:%s", mail.Recipient, config.Name)
 	intCmd := c.rdb.Incr(key)
@@ -60,13 +60,18 @@ func (c client) Send(mail *pb.Notification, config *pb.Config) (*pb.Result, erro
 	}
 
 	if count > config.Limit {
+		c.logger.Debug("rejecting notification",
+			zap.Int64("request_count", count),
+			zap.String("recipient", mail.Recipient),
+			zap.String("notification_config", config.Name),
+			zap.Duration("ttl", ttl))
 		return &pb.Result{
 			Status:          pb.Status_REJECTED,
 			ResponseMessage: "notification to recipient was rejected",
 		}, nil
 	}
 
-	c.logger.Info("sending notification",
+	c.logger.Debug("sending notification to gRPC delegate",
 		zap.Int64("request_count", count),
 		zap.String("recipient", mail.Recipient),
 		zap.String("notification_config", config.Name),

@@ -26,14 +26,16 @@ func NewController(client service.Client) Controller {
 		logger: zap.L(),
 	}
 }
+
 func (c controller) StartServer() error {
+	c.logger.Debug("starting GIN server")
 	r := gin.Default()
 	r.POST("/send", c.SendNotification)
 	return r.Run()
 }
 
 func (c controller) SendNotification(ctx *gin.Context) {
-	//TODO: parse from request body
+	c.logger.Debug("notification received on GIN handler", zap.String("handler", "SendNotification"))
 	mail := pb.Notification{
 		Recipient: "smotavitam@gmail.com",
 		Message:   "Hello there, this is our latest news!!!",
@@ -45,6 +47,7 @@ func (c controller) SendNotification(ctx *gin.Context) {
 		Unit:  durationpb.New(time.Second * time.Duration(10)),
 	}
 
+	c.logger.Debug("notification forwarded to service")
 	res, err := c.client.Send(&mail, &config)
 	if err != nil {
 		c.logger.Error("error sending notification to client", zap.Error(err))
@@ -53,6 +56,7 @@ func (c controller) SendNotification(ctx *gin.Context) {
 			return
 		}
 
+		c.logger.Debug("notification response received (with error)", zap.String("status", res.Status.String()))
 		switch res.Status {
 		case pb.Status_SENT:
 			ctx.JSON(http.StatusOK, "notification sent to recipient, yet an error occurred")
@@ -65,6 +69,7 @@ func (c controller) SendNotification(ctx *gin.Context) {
 		return
 	}
 
+	c.logger.Debug("notification response received", zap.String("status", res.Status.String()))
 	switch res.Status {
 	case pb.Status_SENT:
 		ctx.JSON(http.StatusOK, "notification sent to recipient")
