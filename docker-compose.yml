@@ -6,7 +6,7 @@ services:
     ports:
       - ${REDIS_EXPOSED_PORT}:${REDIS_PORT}
     networks:
-      - cache
+      - db-cache
 
   nginx:
     hostname: ${NGINX_HOST}
@@ -41,7 +41,7 @@ services:
       - ${RATE_LIMITER_HTTP_PORT}:${RATE_LIMITER_HTTP_PORT}
     networks:
       - backend
-      - cache
+      - db-cache
 
   notification:
     hostname: ${NOTIFICATION_HOST}
@@ -59,7 +59,8 @@ services:
       - ${NOTIFICATION_GRPC_PORT}:${NOTIFICATION_GRPC_PORT}
     networks:
       - backend
+      - db-cache
 
 networks:
   backend:
-  cache:
+  db-cache:

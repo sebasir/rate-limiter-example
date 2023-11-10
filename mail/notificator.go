@@ -17,7 +17,7 @@ func NewClient() service.Client {
 	}
 }
 
-func (c client) Send(notification *pb.Notification, _ *pb.Config) (*pb.Result, error) {
+func (c client) Send(notification *pb.Notification) (*pb.Result, error) {
 	c.logger.Debug("sending notification to recipient", zap.String("recipient", notification.Recipient))
 
 	// send email...

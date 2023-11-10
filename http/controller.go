@@ -1,23 +1,25 @@
 package http
 
 import (
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	pb "github.com/sebasir/rate-limiter-example/notification/proto"
 	"github.com/sebasir/rate-limiter-example/service"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/durationpb"
+	"io"
 	"net/http"
-	"time"
 )
 
 type Controller interface {
 	StartServer() error
 	SendNotification(ctx *gin.Context)
+	ListTypes(ctx *gin.Context)
 }
 
 type controller struct {
-	client service.Client
-	logger *zap.Logger
+	client       service.Client
+	configClient service.ExtendedClient
+	logger       *zap.Logger
 }
 
 func NewController(client service.Client) Controller {
@@ -27,28 +29,43 @@ func NewController(client service.Client) Controller {
 	}
 }
 
+func NewControllerWithConfig(client service.ExtendedClient) Controller {
+	return &controller{
+		configClient: client,
+		client:       service.Client(client),
+		logger:       zap.L(),
+	}
+}
+
 func (c controller) StartServer() error {
 	c.logger.Debug("starting GIN server")
 	r := gin.Default()
 	r.POST("/send", c.SendNotification)
+	if c.configClient != nil {
+		r.GET("/type/list", c.ListTypes)
+	}
 	return r.Run()
 }
 
 func (c controller) SendNotification(ctx *gin.Context) {
 	c.logger.Debug("notification received on GIN handler", zap.String("handler", "SendNotification"))
-	mail := pb.Notification{
-		Recipient: "smotavitam@gmail.com",
-		Message:   "Hello there, this is our latest news!!!",
+
+	jsonData, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		c.logger.Error("error reading request body", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, "error reading request body")
+		return
 	}
 
-	config := pb.Config{
-		Name:  "Newsletter",
-		Limit: 2,
-		Unit:  durationpb.New(time.Second * time.Duration(10)),
+	notification := pb.Notification{}
+	if err := json.Unmarshal(jsonData, &notification); err != nil {
+		c.logger.Error("error reading request body", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, "error parsing request body")
+		return
 	}
 
 	c.logger.Debug("notification forwarded to service")
-	res, err := c.client.Send(&mail, &config)
+	res, err := c.client.Send(&notification)
 	if err != nil {
 		c.logger.Error("error sending notification to client", zap.Error(err))
 		if res == nil {
@@ -78,4 +95,20 @@ func (c controller) SendNotification(ctx *gin.Context) {
 	case pb.Status_ERROR:
 		ctx.JSON(http.StatusInternalServerError, "internal server error")
 	}
+}
+
+func (c controller) ListTypes(ctx *gin.Context) {
+	configs, err := c.configClient.ListNotificationConfig()
+	if err != nil {
+		c.logger.Error("error listing notification types", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, "internal server error")
+	}
+
+	jsonByte, err := json.Marshal(configs)
+	if err != nil {
+		c.logger.Error("error marshalling notification types", zap.Error(err))
+		ctx.JSON(http.StatusInternalServerError, "internal server error")
+	}
+
+	ctx.JSON(http.StatusOK, string(jsonByte))
 }

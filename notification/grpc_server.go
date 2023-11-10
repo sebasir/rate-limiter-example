@@ -21,7 +21,7 @@ func NewServer(client service.Client) *Server {
 }
 
 func (s *Server) Send(_ context.Context, request *pb.NotificationRequest) (*pb.NotificationResponse, error) {
-	result, err := s.notificationClient.Send(request.GetNotification(), request.GetConfig())
+	result, err := s.notificationClient.Send(request.GetNotification())
 	if err != nil {
 		return nil, err
 	}

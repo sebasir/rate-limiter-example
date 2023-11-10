@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "google/protobuf/duration.proto";
-
 package notification;
 
 option go_package = "notification/proto";
@@ -17,20 +15,14 @@ message Result {
   string response_message = 2;
 }
 
-message Config {
-  string name = 1;
-  int64 limit = 2;
-  google.protobuf.Duration Unit = 3;
-}
-
 message Notification {
   string recipient = 1;
   string message = 2;
+  string notificationType = 3;
 }
 
 message NotificationRequest {
-  Config config = 1;
-  Notification notification = 2;
+  Notification notification = 1;
 }
 
 message NotificationResponse {

@@ -19,9 +19,8 @@ func NewGRPCClient(serviceClient pb.NotificationServiceClient) service.Client {
 	}
 }
 
-func (c grpcClient) Send(notification *pb.Notification, config *pb.Config) (*pb.Result, error) {
+func (c grpcClient) Send(notification *pb.Notification) (*pb.Result, error) {
 	request := &pb.NotificationRequest{
-		Config:       config,
 		Notification: notification,
 	}
 

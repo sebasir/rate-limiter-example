@@ -4,6 +4,7 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/sebasir/rate-limiter-example/config"
 	"github.com/sebasir/rate-limiter-example/http"
+	"github.com/sebasir/rate-limiter-example/manager"
 	pb "github.com/sebasir/rate-limiter-example/notification/proto"
 	ratelimiter "github.com/sebasir/rate-limiter-example/rate_limiter"
 	"go.uber.org/zap"
@@ -59,9 +60,10 @@ func main() {
 		logger.Fatal("error setting GIN port env variable", zap.Error(err))
 	}
 
+	mgr := manager.NewClient(rdb)
 	delegate := ratelimiter.NewGRPCClient(c)
-	client := ratelimiter.NewClient(rdb, delegate)
-	controller := http.NewController(client)
+	client := ratelimiter.NewClient(rdb, delegate, mgr)
+	controller := http.NewControllerWithConfig(client)
 	logger.Debug("starting GIN HTTP server", zap.Int("port", cfg.RateLimiterHttpPort))
 	if err = controller.StartServer(); err != nil {
 		logger.Fatal("error when serving HTTP", zap.Error(err), zap.Int("port", cfg.RateLimiterHttpPort))

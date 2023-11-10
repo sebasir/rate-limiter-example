@@ -1,9 +1,19 @@
 package service
 
 import (
+	"github.com/sebasir/rate-limiter-example/model"
 	pb "github.com/sebasir/rate-limiter-example/notification/proto"
 )
 
 type Client interface {
-	Send(mail *pb.Notification, config *pb.Config) (*pb.Result, error)
+	Send(notification *pb.Notification) (*pb.Result, error)
+}
+
+type ConfigClient interface {
+	ListNotificationConfig() ([]*model.Config, error)
+}
+
+type ExtendedClient interface {
+	Client
+	ConfigClient
 }
