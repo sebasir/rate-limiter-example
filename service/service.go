@@ -11,6 +11,7 @@ type Client interface {
 
 type ConfigClient interface {
 	ListNotificationConfig() ([]*model.Config, error)
+	PersistNotificationConfig(*model.Config) error
 }
 
 type ExtendedClient interface {

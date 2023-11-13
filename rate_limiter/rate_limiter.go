@@ -12,35 +12,36 @@ import (
 )
 
 var InternalErrorResult = &pb.Result{
-	Status:          pb.Status_ERROR,
+	Status:          pb.Status_INTERNAL_ERROR,
 	ResponseMessage: "internal server error",
 }
 
 type client struct {
-	rdb      *redis.Client
 	delegate service.Client
 	manager  manager.Service
+	rdb      *redis.Client
 	logger   *zap.Logger
 }
 
 func NewClient(rdb *redis.Client, delegate service.Client, manager manager.Service) service.ExtendedClient {
 	return &client{
-		rdb:      rdb,
 		delegate: delegate,
 		manager:  manager,
+		rdb:      rdb,
 		logger:   zap.L(),
 	}
 }
 
-func (c client) Send(n *pb.Notification) (*pb.Result, error) {
-	c.logger.Debug("sending notification", zap.String("recipient", n.Recipient))
+func (c *client) Send(n *pb.Notification) (*pb.Result, error) {
+	recipientField := zap.String("recipient", n.Recipient)
+
+	c.logger.Debug("sending notification", recipientField)
 
 	config, err := c.manager.GetByName(n.NotificationType)
 	if err != nil {
-		c.logger.Error("error trying to fetch notification type configuration",
-			zap.Error(err),
-			zap.String("notification_type", n.NotificationType))
-		return InternalErrorResult, err
+		msg := "error trying to fetch notification type configuration"
+		c.logger.Error(msg, zap.Error(err), zap.String("notification_type", n.NotificationType))
+		return InternalErrorResult, fmt.Errorf("%s: %w", msg, err)
 	}
 
 	key := fmt.Sprintf("%s:%s", n.Recipient, n.NotificationType)
@@ -48,50 +49,53 @@ func (c client) Send(n *pb.Notification) (*pb.Result, error) {
 
 	count, err := intCmd.Result()
 	if err != nil {
-		c.logger.Error("error trying to persist count in cache", zap.Error(err))
-		return InternalErrorResult, err
+		msg := "error trying to persist count in cache"
+		c.logger.Error(msg, zap.Error(err))
+		return InternalErrorResult, fmt.Errorf("%s: %w", msg, err)
 	}
 
+	keyField := zap.String("key", key)
 	var ttl time.Duration
-	timeWindow := config.Unit
+	timeWindow := config.TimeUnit * time.Duration(config.TimeAmount)
 	if count == 1 {
 		boolCmd := c.rdb.Expire(key, timeWindow)
 		_, err = boolCmd.Result()
 		if err != nil {
-			c.logger.Error("error trying to submit expiration", zap.String("key", key))
-			return InternalErrorResult, err
+			msg := "error trying to submit expiration"
+			c.logger.Error(msg, keyField)
+			return InternalErrorResult, fmt.Errorf("%s: %w", msg, err)
 		}
 		ttl = timeWindow
 	} else {
 		durationCmd := c.rdb.TTL(key)
 		ttl, err = durationCmd.Result()
 		if err != nil {
-			c.logger.Error("error trying to acquire current TTL", zap.String("key", key))
-			return InternalErrorResult, err
+			msg := "error trying to acquire current TTL"
+			c.logger.Error(msg, keyField)
+			return InternalErrorResult, fmt.Errorf("%s: %w", msg, err)
 		}
 	}
 
-	if count > config.Limit {
-		c.logger.Debug("rejecting notification",
-			zap.Int64("request_count", count),
-			zap.String("recipient", n.Recipient),
-			zap.String("notification_config", config.Name),
-			zap.Duration("ttl", ttl))
+	countField := zap.Int64("request_count", count)
+	configField := zap.String("notification_config", config.Name)
+	ttlField := zap.Duration("ttl", ttl)
+
+	if count > config.LimitCount {
+		c.logger.Debug("rejecting notification", countField, recipientField, configField, ttlField)
 		return &pb.Result{
 			Status:          pb.Status_REJECTED,
 			ResponseMessage: "notification to recipient was rejected",
 		}, nil
 	}
 
-	c.logger.Debug("sending notification to gRPC delegate",
-		zap.Int64("request_count", count),
-		zap.String("recipient", n.Recipient),
-		zap.String("notification_config", config.Name),
-		zap.Duration("ttl", ttl))
-
+	c.logger.Debug("sending notification to gRPC delegate", countField, recipientField, configField, ttlField)
 	return c.delegate.Send(n)
 }
 
-func (c client) ListNotificationConfig() ([]*model.Config, error) {
+func (c *client) ListNotificationConfig() ([]*model.Config, error) {
 	return c.manager.ListNotificationConfig()
+}
+
+func (c *client) PersistNotificationConfig(config *model.Config) error {
+	return c.manager.PersistNotificationConfig(config)
 }

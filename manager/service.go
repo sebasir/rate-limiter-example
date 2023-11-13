@@ -3,6 +3,7 @@ package manager
 import (
 	"fmt"
 	"github.com/go-redis/redis"
+	"github.com/sebasir/rate-limiter-example/app_errors"
 	"github.com/sebasir/rate-limiter-example/model"
 	"github.com/sebasir/rate-limiter-example/service"
 	"go.uber.org/zap"
@@ -11,7 +12,6 @@ import (
 type Service interface {
 	service.ConfigClient
 	GetByName(name string) (*model.Config, error)
-	Persist(*model.Config) error
 }
 
 type client struct {
@@ -55,7 +55,7 @@ func (c *client) ListNotificationConfig() ([]*model.Config, error) {
 		}
 	}
 
-	return nil, nil
+	return allKeys, nil
 }
 
 func (c *client) GetByName(name string) (*model.Config, error) {
@@ -64,7 +64,7 @@ func (c *client) GetByName(name string) (*model.Config, error) {
 	return c.getByKey(key(name))
 }
 
-func (c *client) Persist(config *model.Config) error {
+func (c *client) PersistNotificationConfig(config *model.Config) error {
 	c.logger.Debug("persisting notification config", zap.String("name", config.Name))
 
 	jsonStr, err := config.AsJSONString()
@@ -85,8 +85,8 @@ func (c *client) Persist(config *model.Config) error {
 func (c *client) getByKey(key string) (*model.Config, error) {
 	strCmd := c.rdb.Get(key)
 	if err := strCmd.Err(); err != nil {
-		c.logger.Error("error retrieving notification config from key", zap.Error(err), zap.String("key", key))
-		return nil, err
+		return nil, app_errors.LogAndError("error retrieving notification config from key",
+			err, c.logger, zap.String("key", key))
 	}
 
 	config := &model.Config{}

@@ -18,11 +18,12 @@ func NewClient() service.Client {
 }
 
 func (c client) Send(notification *pb.Notification) (*pb.Result, error) {
-	c.logger.Debug("sending notification to recipient", zap.String("recipient", notification.Recipient))
+	notificationField := zap.String("recipient", notification.Recipient)
+	c.logger.Info("sending notification to recipient", notificationField)
 
 	// send email...
 
-	c.logger.Debug("notification sent to recipient", zap.String("recipient", notification.Recipient))
+	c.logger.Debug("notification sent to recipient", notificationField)
 	return &pb.Result{
 		Status:          pb.Status_SENT,
 		ResponseMessage: fmt.Sprintf("notification sent to recipient (%s)", notification.Recipient),
