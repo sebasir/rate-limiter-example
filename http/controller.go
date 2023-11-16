@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/sebasir/rate-limiter-example/model"
 	pb "github.com/sebasir/rate-limiter-example/notification/proto"
@@ -21,7 +20,7 @@ type controller struct {
 	client       service.Client
 	configClient service.ExtendedClient
 	logger       *zap.Logger
-	validator    *Validator
+	validator    *CustomValidator
 }
 
 func NewController(client service.Client) Controller {
@@ -46,8 +45,8 @@ func (c controller) StartServer() error {
 	r := gin.Default()
 	r.POST("/send", c.SendNotification)
 	if c.configClient != nil {
-		r.GET("/type/list", c.ListNotificationTypes)
-		r.PUT("/type/", c.SaveNotificationType)
+		r.GET("/types", c.ListNotificationTypes)
+		r.PUT("/types", c.SaveNotificationType)
 	}
 	return r.Run()
 }
@@ -81,22 +80,23 @@ func (c controller) SendNotification(ctx *gin.Context) {
 		if res == nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{
 				"message": "empty response message",
-				"error":   err,
+				"error":   err.Error(),
 			})
 			return
 		}
 
-		c.logger.Debug("notification response received (with error)", zap.String("status", res.Status.String()))
+		c.logger.Debug("notification response received (with error)",
+			zap.Error(err), zap.String("status", res.Status.String()))
 		switch res.Status {
 		case pb.Status_SENT:
 			ctx.JSON(http.StatusOK, gin.H{
 				"message": "notification sent to recipient, yet an error occurred",
-				"error":   err,
+				"error":   err.Error(),
 			})
 		case pb.Status_REJECTED:
 			ctx.JSON(http.StatusTooManyRequests, gin.H{
 				"message": "notification was rejected by rate limiter, yet an error occurred",
-				"error":   err,
+				"error":   err.Error(),
 			})
 		case pb.Status_INTERNAL_ERROR:
 			ctx.JSON(http.StatusInternalServerError, gin.H{
@@ -106,7 +106,7 @@ func (c controller) SendNotification(ctx *gin.Context) {
 		case pb.Status_INVALID_NOTIFICATION:
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"message": "invalid user input",
-				"error":   err,
+				"error":   err.Error(),
 			})
 		}
 
@@ -140,30 +140,18 @@ func (c controller) ListNotificationTypes(ctx *gin.Context) {
 		c.logger.Error("error listing notification types", zap.Error(err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"message": "internal server error",
-			"error":   err,
+			"error":   err.Error(),
 		})
 		return
 	}
 
 	if len(configs) == 0 {
 		c.logger.Info("no notification types found")
-		ctx.JSON(http.StatusNoContent, gin.H{
-			"message": "no notification types found",
-		})
+		ctx.JSON(http.StatusNoContent, nil)
 		return
 	}
 
-	jsonByte, err := json.Marshal(configs)
-	if err != nil {
-		c.logger.Error("error marshalling notification types", zap.Error(err))
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "internal server error",
-			"error":   err,
-		})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, string(jsonByte))
+	ctx.JSON(http.StatusOK, configs)
 }
 
 func (c controller) SaveNotificationType(ctx *gin.Context) {
@@ -172,7 +160,7 @@ func (c controller) SaveNotificationType(ctx *gin.Context) {
 		c.logger.Error("error parsing request body", zap.Error(err))
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"message": "error processing input",
-			"error":   err,
+			"error":   err.Error(),
 		})
 		return
 	}
@@ -181,7 +169,7 @@ func (c controller) SaveNotificationType(ctx *gin.Context) {
 		c.logger.Error("error parsing request body", zap.Error(err))
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"message": "error processing input",
-			"error":   err,
+			"error":   c.validator.Translate(err),
 		})
 		return
 	}
@@ -190,7 +178,10 @@ func (c controller) SaveNotificationType(ctx *gin.Context) {
 		c.logger.Error("error persisting notification config", zap.Error(err))
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"message": "error persisting notification input",
-			"error":   err,
+			"error":   err.Error(),
 		})
+		return
 	}
+
+	ctx.JSON(http.StatusNoContent, nil)
 }

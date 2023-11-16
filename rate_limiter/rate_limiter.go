@@ -1,8 +1,10 @@
 package ratelimiter
 
 import (
+	"errors"
 	"fmt"
 	"github.com/go-redis/redis"
+	. "github.com/sebasir/rate-limiter-example/app_errors"
 	"github.com/sebasir/rate-limiter-example/manager"
 	"github.com/sebasir/rate-limiter-example/model"
 	pb "github.com/sebasir/rate-limiter-example/notification/proto"
@@ -13,17 +15,19 @@ import (
 
 var InternalErrorResult = &pb.Result{
 	Status:          pb.Status_INTERNAL_ERROR,
-	ResponseMessage: "internal server error",
+	ResponseMessage: "error processing notification request",
 }
+
+var ErrProcessingNotificationRequest = errors.New("error processing notification request")
 
 type client struct {
 	delegate service.Client
 	manager  manager.Service
-	rdb      *redis.Client
+	rdb      redis.Cmdable
 	logger   *zap.Logger
 }
 
-func NewClient(rdb *redis.Client, delegate service.Client, manager manager.Service) service.ExtendedClient {
+func NewClient(rdb redis.Cmdable, delegate service.Client, manager manager.Service) service.ExtendedClient {
 	return &client{
 		delegate: delegate,
 		manager:  manager,
@@ -39,9 +43,8 @@ func (c *client) Send(n *pb.Notification) (*pb.Result, error) {
 
 	config, err := c.manager.GetByName(n.NotificationType)
 	if err != nil {
-		msg := "error trying to fetch notification type configuration"
-		c.logger.Error(msg, zap.Error(err), zap.String("notification_type", n.NotificationType))
-		return InternalErrorResult, fmt.Errorf("%s: %w", msg, err)
+		return InternalErrorResult, LogAndError("error trying to fetch notification type configuration",
+			errors.Join(err, ErrProcessingNotificationRequest), c.logger, zap.String("notification_type", n.NotificationType))
 	}
 
 	key := fmt.Sprintf("%s:%s", n.Recipient, n.NotificationType)
@@ -49,30 +52,27 @@ func (c *client) Send(n *pb.Notification) (*pb.Result, error) {
 
 	count, err := intCmd.Result()
 	if err != nil {
-		msg := "error trying to persist count in cache"
-		c.logger.Error(msg, zap.Error(err))
-		return InternalErrorResult, fmt.Errorf("%s: %w", msg, err)
+		return InternalErrorResult, LogAndError("error trying to persist count in cache",
+			errors.Join(err, ErrProcessingNotificationRequest), c.logger, recipientField)
 	}
 
 	keyField := zap.String("key", key)
 	var ttl time.Duration
-	timeWindow := config.TimeUnit * time.Duration(config.TimeAmount)
+	timeWindow := config.CalculateTime()
 	if count == 1 {
 		boolCmd := c.rdb.Expire(key, timeWindow)
 		_, err = boolCmd.Result()
 		if err != nil {
-			msg := "error trying to submit expiration"
-			c.logger.Error(msg, keyField)
-			return InternalErrorResult, fmt.Errorf("%s: %w", msg, err)
+			return InternalErrorResult, LogAndError("error trying to submit expiration",
+				errors.Join(err, ErrProcessingNotificationRequest), c.logger, keyField)
 		}
 		ttl = timeWindow
 	} else {
 		durationCmd := c.rdb.TTL(key)
 		ttl, err = durationCmd.Result()
 		if err != nil {
-			msg := "error trying to acquire current TTL"
-			c.logger.Error(msg, keyField)
-			return InternalErrorResult, fmt.Errorf("%s: %w", msg, err)
+			return InternalErrorResult, LogAndError("error trying to acquire current TTL",
+				errors.Join(err, ErrProcessingNotificationRequest), c.logger, keyField)
 		}
 	}
 
@@ -89,7 +89,12 @@ func (c *client) Send(n *pb.Notification) (*pb.Result, error) {
 	}
 
 	c.logger.Debug("sending notification to gRPC delegate", countField, recipientField, configField, ttlField)
-	return c.delegate.Send(n)
+	res, err := c.delegate.Send(n)
+	if err != nil {
+		return InternalErrorResult, LogAndError("error trying to send notification",
+			errors.Join(err, ErrProcessingNotificationRequest), c.logger, recipientField)
+	}
+	return res, nil
 }
 
 func (c *client) ListNotificationConfig() ([]*model.Config, error) {

@@ -16,12 +16,12 @@ var (
 func ParseRequestBody[V pb.Notification | model.Config](r io.Reader) (*V, error) {
 	jsonData, err := io.ReadAll(r)
 	if err != nil {
-		return nil, errReadingRequestBody
+		return nil, errors.Join(err, errReadingRequestBody)
 	}
 
 	target := new(V)
 	if err := json.Unmarshal(jsonData, target); err != nil {
-		return nil, errParsingRequestBody
+		return nil, errors.Join(err, errParsingRequestBody)
 	}
 
 	return target, nil

@@ -5,23 +5,47 @@ import (
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	translations "github.com/go-playground/validator/v10/translations/en"
+	"github.com/sebasir/rate-limiter-example/model"
 	"github.com/sebasir/rate-limiter-example/notification/proto"
 )
 
-type Validator struct {
+type CustomValidator struct {
 	*validator.Validate
 	trans ut.Translator
 }
 
-func GetValidator() *Validator {
+func GetValidator() *CustomValidator {
 	val := validator.New()
+
+	isTimeUnitTag := "time-unit"
+
+	if err := val.RegisterValidation(isTimeUnitTag, ValidateTimeUnit); err != nil {
+		return nil
+	}
 
 	en := locale.New()
 	uni := ut.New(en, en)
 	trans, _ := uni.GetTranslator("en")
 
-	err := translations.RegisterDefaultTranslations(val, trans)
-	if err != nil {
+	if err := translations.RegisterDefaultTranslations(val, trans); err != nil {
+		return nil
+	}
+
+	if err := val.RegisterTranslation(isTimeUnitTag, trans,
+		func(ut ut.Translator) (err error) {
+			if err = ut.Add(isTimeUnitTag, "{0} must be one of SECOND, MINUTE, HOUR, DAY", false); err != nil {
+				return
+			}
+
+			return
+		}, func(ut ut.Translator, fe validator.FieldError) string {
+			t, err := ut.T(fe.Tag(), fe.Field())
+			if err != nil {
+				return fe.(error).Error()
+			}
+
+			return t
+		}); err != nil {
 		return nil
 	}
 
@@ -31,16 +55,22 @@ func GetValidator() *Validator {
 		"Message":          "required",
 	}, proto.Notification{})
 
-	return &Validator{
+	return &CustomValidator{
 		Validate: val,
 		trans:    trans,
 	}
 }
 
-func (v *Validator) Translate(err error) map[string]string {
+func (v *CustomValidator) Translate(err error) map[string]string {
 	return err.(validator.ValidationErrors).Translate(v.trans)
 }
 
-func (v *Validator) RegisterStructValidationMapRules(rules map[string]string, types ...interface{}) {
+func (v *CustomValidator) RegisterStructValidationMapRules(rules map[string]string, types ...interface{}) {
 	v.Validate.RegisterStructValidationMapRules(rules, types...)
+}
+
+func ValidateTimeUnit(fl validator.FieldLevel) bool {
+	val := fl.Field().String()
+	_, exists := model.TimeUnitMap[val]
+	return exists
 }
