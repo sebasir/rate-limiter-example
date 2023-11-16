@@ -3,8 +3,6 @@ services:
   redis:
     hostname: ${REDIS_HOST}
     image: redis:latest
-    ports:
-      - ${REDIS_EXPOSED_PORT}:${REDIS_PORT}
     networks:
       - db-cache
 
@@ -37,8 +35,6 @@ services:
       REDIS_EXPOSED_PORT: ${REDIS_EXPOSED_PORT}
       NOTIFICATION_HOST: ${NOTIFICATION_HOST}
       NOTIFICATION_GRPC_PORT: ${NOTIFICATION_GRPC_PORT}
-    ports:
-      - ${RATE_LIMITER_HTTP_PORT}:${RATE_LIMITER_HTTP_PORT}
     networks:
       - backend
       - db-cache
@@ -54,9 +50,6 @@ services:
       DEBUG: ${DEBUG}
       NOTIFICATION_HTTP_PORT: ${NOTIFICATION_HTTP_PORT}
       NOTIFICATION_GRPC_PORT: ${NOTIFICATION_GRPC_PORT}
-    ports:
-      - ${NOTIFICATION_HTTP_PORT}:${NOTIFICATION_HTTP_PORT}
-      - ${NOTIFICATION_GRPC_PORT}:${NOTIFICATION_GRPC_PORT}
     networks:
       - backend
       - db-cache

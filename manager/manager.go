@@ -40,7 +40,7 @@ func (c *client) ListNotificationConfig() ([]*model.Config, error) {
 		for i, value := range foundSet {
 			config, err := c.getByKey(value)
 			if err != nil {
-				return nil, LogAndError("error retrieving notification config from fmtKey",
+				return nil, LogAndError("error retrieving notification config from key",
 					err, c.logger, zap.String("value", value))
 			}
 			tempConfigs[i] = config
@@ -85,7 +85,7 @@ func (c *client) getByKey(key string) (*model.Config, error) {
 	keyField := zap.String("key", key)
 	strCmd := c.rdb.Get(key)
 	if err := strCmd.Err(); err != nil {
-		return nil, LogAndError("error retrieving notification config from fmtKey",
+		return nil, LogAndError("error retrieving notification config from key",
 			errors.Join(err, ErrOperatingNotificationConfig), c.logger, keyField)
 	}
 

@@ -6,6 +6,10 @@ server {
         proxy_pass http://{{RATE_LIMITER_HOST}}:{{RATE_LIMITER_HTTP_PORT}}/send;
     }
 
+        location /notification/types {
+            proxy_pass http://{{RATE_LIMITER_HOST}}:{{RATE_LIMITER_HTTP_PORT}}/types;
+        }
+
     location /notification/no-limited/send {
         proxy_pass http://{{NOTIFICATION_HOST}}:{{NOTIFICATION_HTTP_PORT}}/send;
     }

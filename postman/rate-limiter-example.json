@@ -1,0 +1,114 @@
+{
+	"info": {
+		"_postman_id": "9ed2bfdf-31ba-48f2-9afb-5a06f2c0026e",
+		"name": "rate-limiter-example",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "3989067"
+	},
+	"item": [
+		{
+			"name": "send-notification",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"notificationType\": \"Newsletter\",\r\n    \"recipient\": \"smotavitam@gmail.com\",\r\n    \"message\": \"Our latest news: Hi!\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/notification/send",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"notification",
+						"send"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get-all-notification-types",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:8080/notification/types",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"notification",
+						"types"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "save-notification-type",
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"name\": \"Newsletter\",\r\n    \"limitCount\": 3,\r\n    \"timeUnit\": \"MINUTE\",\r\n    \"timeAmount\": 1\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/notification/types",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"notification",
+						"types"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "send-notification (no-limited)",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"notificationType\": \"Newsletter\",\r\n    \"recipient\": \"smotavitam@gmail.com\",\r\n    \"message\": \"Our latest news: Hi!\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/notification/no-limited/send",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"notification",
+						"no-limited",
+						"send"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
